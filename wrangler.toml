@@ -4,3 +4,8 @@ compatibility_date = "2024-01-01"
 
 [vars]
 # API Key 将在 Cloudflare Dashboard 中配置为 Secret
+
+[[d1_databases]]
+binding = "DB"
+database_name = "image-background-remover"
+database_id = "8e0f467a-4a6b-4f67-b5ef-b4b108df1d03"
