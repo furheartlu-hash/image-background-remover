@@ -8,8 +8,15 @@ const PLANS = {
   credits20:{ price: '5.00',  credits: 20,  label: 'Pay-as-you-go - 20 credits' },
 };
 
+// Set PAYPAL_MODE=live in Cloudflare secrets when going to production
+function paypalBase(env) {
+  return env.PAYPAL_MODE === 'live'
+    ? 'https://api-m.paypal.com'
+    : 'https://api-m.sandbox.paypal.com';
+}
+
 async function getPayPalToken(env) {
-  const res = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
+  const res = await fetch(`${paypalBase(env)}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
       'Authorization': 'Basic ' + btoa(`${env.PAYPAL_CLIENT_ID}:${env.PAYPAL_CLIENT_SECRET}`),
@@ -40,7 +47,7 @@ export async function onRequestPost({ request, env }) {
   const token = await getPayPalToken(env);
   const origin = new URL(request.url).origin;
 
-  const orderRes = await fetch('https://api-m.paypal.com/v2/checkout/orders', {
+  const orderRes = await fetch(`${paypalBase(env)}/v2/checkout/orders`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
