@@ -17,8 +17,8 @@ export async function onRequestGet({ request, env }) {
       name: user.name,
       email: user.email,
       avatar: user.avatar_url,
-      plan: user.plan,
-      credits: user.credits,
+      plan: user.plan || 'free',
+      credits: user.credits ?? 0,
     },
   });
 }
