@@ -1,5 +1,3 @@
-// functions/api/paypal-capture-order.js
-
 const PLANS = {
   basic: { credits: 30, plan: 'basic', resetDays: 30 },
   pro: { credits: 100, plan: 'pro', resetDays: 30 },
@@ -24,6 +22,12 @@ async function getPayPalToken(env) {
   });
 
   const data = await res.json();
+
+  if (!data.access_token) {
+    console.error('[paypal-capture-order] Failed to get PayPal token', data);
+    throw new Error('Failed to get PayPal token');
+  }
+
   return data.access_token;
 }
 
@@ -31,13 +35,14 @@ export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const origin = url.origin;
 
-  const redirectTo = (path) => {
-    return Response.redirect(`${origin}${path}`, 302);
-  };
+  const redirectTo = (path) => Response.redirect(`${origin}${path}`, 302);
 
   try {
     const token = url.searchParams.get('token');
-    if (!token) return redirectTo('/?payment=failed');
+    if (!token) {
+      console.error('[paypal-capture-order] Missing token');
+      return redirectTo('/?payment=failed');
+    }
 
     const ppToken = await getPayPalToken(env);
 
@@ -50,9 +55,10 @@ export async function onRequestGet({ request, env }) {
     });
 
     const capture = await captureRes.json();
-    console.log('PayPal Capture Response:', JSON.stringify(capture));
+    console.log('[paypal-capture-order] Capture response:', JSON.stringify(capture));
 
     if (capture.status !== 'COMPLETED') {
+      console.error('[paypal-capture-order] Capture not completed', capture);
       return redirectTo('/?payment=failed');
     }
 
@@ -62,6 +68,7 @@ export async function onRequestGet({ request, env }) {
       '';
 
     if (!customId || !customId.includes('|')) {
+      console.error('[paypal-capture-order] Invalid custom_id', { customId, capture });
       return redirectTo('/?payment=failed');
     }
 
@@ -69,6 +76,7 @@ export async function onRequestGet({ request, env }) {
     const planInfo = PLANS[plan];
 
     if (!userId || !planInfo) {
+      console.error('[paypal-capture-order] Invalid userId or plan', { userId, plan });
       return redirectTo('/?payment=failed');
     }
 
@@ -77,6 +85,11 @@ export async function onRequestGet({ request, env }) {
       const d = new Date();
       d.setDate(d.getDate() + planInfo.resetDays);
       resetAt = d.toISOString();
+    }
+
+    if (!env.DB || typeof env.DB.prepare !== 'function') {
+      console.error('[paypal-capture-order] D1 binding DB is missing');
+      return redirectTo('/?payment=failed');
     }
 
     if (planInfo.plan) {
@@ -95,7 +108,7 @@ export async function onRequestGet({ request, env }) {
 
     return redirectTo('/?payment=success');
   } catch (err) {
-    console.error('paypal-capture-order crashed:', err);
-    return new Response(`PayPal capture crashed: ${err.message}`, { status: 500 });
+    console.error('[paypal-capture-order] Unhandled error:', err);
+    return redirectTo('/?payment=failed');
   }
 }
