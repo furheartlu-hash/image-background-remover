@@ -1,18 +1,25 @@
 export async function onRequestGet({ request, env }) {
+  const url = new URL(request.url);
+  const origin = url.origin;
+
+  const redirectTo = (path) => Response.redirect(`${origin}${path}`, 302);
+
   try {
-    const url = new URL(request.url);
     const code = url.searchParams.get('code');
 
     if (!code) {
-      return new Response('Missing code', { status: 400 });
+      console.error('[auth/callback] Missing code');
+      return redirectTo('/?login=failed');
     }
 
     if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
-      return new Response('Google OAuth env vars missing', { status: 500 });
+      console.error('[auth/callback] Google OAuth env vars missing');
+      return redirectTo('/?login=failed');
     }
 
     if (!env.DB || typeof env.DB.prepare !== 'function') {
-      return new Response('D1 binding DB is missing', { status: 500 });
+      console.error('[auth/callback] D1 binding DB is missing');
+      return redirectTo('/?login=failed');
     }
 
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -22,7 +29,7 @@ export async function onRequestGet({ request, env }) {
         code,
         client_id: env.GOOGLE_CLIENT_ID,
         client_secret: env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: `${url.origin}/auth/callback`,
+        redirect_uri: `${origin}/auth/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -30,10 +37,8 @@ export async function onRequestGet({ request, env }) {
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      return new Response(
-        `OAuth failed: ${JSON.stringify(tokenData)}`,
-        { status: 400 }
-      );
+      console.error('[auth/callback] OAuth token exchange failed', tokenData);
+      return redirectTo('/?login=failed');
     }
 
     const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -45,10 +50,8 @@ export async function onRequestGet({ request, env }) {
     const googleUser = await userRes.json();
 
     if (!googleUser.id || !googleUser.email) {
-      return new Response(
-        `Google user info invalid: ${JSON.stringify(googleUser)}`,
-        { status: 500 }
-      );
+      console.error('[auth/callback] Invalid Google user info', googleUser);
+      return redirectTo('/?login=failed');
     }
 
     const sessionToken = crypto.randomUUID();
@@ -80,6 +83,7 @@ export async function onRequestGet({ request, env }) {
       },
     });
   } catch (err) {
-    return new Response(`Callback crashed: ${err.message}`, { status: 500 });
+    console.error('[auth/callback] Unhandled error:', err);
+    return redirectTo('/?login=failed');
   }
 }
