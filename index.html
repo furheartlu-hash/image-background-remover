@@ -438,15 +438,20 @@
     document.getElementById('modalConfirmBtn').onclick = null;
   }
 
-  // ── payment result banners ────────────────────────────────────────────────
   const params = new URLSearchParams(location.search);
-  if (params.get('payment') === 'success') {
-    document.getElementById('paymentBannerSuccess').style.display = 'block';
-    history.replaceState({}, '', '/');
-  } else if (params.get('payment') === 'failed' || params.get('payment') === 'cancelled') {
-    document.getElementById('paymentBannerFailed').style.display = 'block';
-    history.replaceState({}, '', '/');
-  }
+
+if (params.get('login') === 'failed') {
+  document.getElementById('paymentBannerFailed').textContent = '❌ Login failed. Please try again.';
+  document.getElementById('paymentBannerFailed').style.display = 'block';
+  history.replaceState({}, '', '/');
+} else if (params.get('payment') === 'success') {
+  document.getElementById('paymentBannerSuccess').style.display = 'block';
+  history.replaceState({}, '', '/');
+} else if (params.get('payment') === 'failed' || params.get('payment') === 'cancelled') {
+  document.getElementById('paymentBannerFailed').textContent = '❌ Payment failed or cancelled. Please try again.';
+  document.getElementById('paymentBannerFailed').style.display = 'block';
+  history.replaceState({}, '', '/');
+}
 
   // ── boot ──────────────────────────────────────────────────────────────────
   loadUser();
